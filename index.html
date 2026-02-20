@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verificación de Seguridad</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --green: #00ff41;
+    --green-dim: #00cc33;
+    --green-dark: #003b00;
+    --red: #ff3333;
+    --amber: #ffb800;
+    --bg: #0a0a0a;
+    --surface: #111;
+    --surface-2: #1a1a1a;
+  }
+
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg);
+    color: var(--green);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Scanline overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 255, 65, 0.015) 2px,
+      rgba(0, 255, 65, 0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Flicker animation */
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    92% { opacity: 1; }
+    93% { opacity: 0.8; }
+    94% { opacity: 1; }
+    96% { opacity: 0.9; }
+    97% { opacity: 1; }
+  }
+
+  @keyframes typing {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+
+  @keyframes blink-caret {
+    from, to { border-color: transparent; }
+    50% { border-color: var(--green); }
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 5px rgba(0,255,65,0.3); }
+    50% { box-shadow: 0 0 20px rgba(0,255,65,0.6), 0 0 40px rgba(0,255,65,0.2); }
+  }
+
+  @keyframes glitch {
+    0% { transform: translate(0); }
+    20% { transform: translate(-2px, 2px); }
+    40% { transform: translate(-2px, -2px); }
+    60% { transform: translate(2px, 2px); }
+    80% { transform: translate(2px, -2px); }
+    100% { transform: translate(0); }
+  }
+
+  @keyframes progress-fill {
+    from { width: 0%; }
+    to { width: 100%; }
+  }
+
+  /* Initial loading screen */
+  #loading-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    transition: opacity 0.5s ease;
+  }
+
+  #loading-screen.fade-out {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .loading-icon {
+    width: 60px;
+    height: 60px;
+    border: 3px solid var(--green-dark);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 24px;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .loading-text {
+    font-size: 14px;
+    color: var(--green-dim);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .progress-bar-container {
+    width: 250px;
+    height: 3px;
+    background: var(--surface-2);
+    margin-top: 16px;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--green);
+    animation: progress-fill 2.5s ease-in-out forwards;
+  }
+
+  /* Main content */
+  #main-content {
+    display: none;
+    padding: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+    animation: flicker 8s infinite;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 30px 0 20px;
+    border-bottom: 1px solid var(--green-dark);
+    margin-bottom: 24px;
+  }
+
+  .header .warning-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    animation: pulse-glow 2s infinite;
+    display: inline-block;
+    width: 70px;
+    height: 70px;
+    line-height: 70px;
+    border-radius: 50%;
+    border: 2px solid var(--red);
+    color: var(--red);
+    text-shadow: 0 0 10px rgba(255,51,51,0.5);
+  }
+
+  .header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--red);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    animation: glitch 0.3s ease-in-out;
+    text-shadow: 0 0 10px rgba(255,51,51,0.4);
+  }
+
+  .header .subtitle {
+    font-size: 11px;
+    color: var(--green-dim);
+    letter-spacing: 2px;
+    opacity: 0.7;
+  }
+
+  /* Terminal lines */
+  .terminal-section {
+    margin-bottom: 20px;
+  }
+
+  .section-label {
+    font-size: 10px;
+    color: var(--amber);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,184,0,0.2);
+  }
+
+  .data-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 8px 12px;
+    margin-bottom: 4px;
+    background: var(--surface);
+    border-left: 2px solid var(--green-dark);
+    border-radius: 0 4px 4px 0;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+    gap: 12px;
+  }
+
+  .data-row.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .data-row:hover {
+    background: var(--surface-2);
+    border-left-color: var(--green);
+  }
+
+  .data-label {
+    font-size: 10px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-width: 100px;
+    flex-shrink: 0;
+  }
+
+  .data-value {
+    font-size: 12px;
+    color: var(--green);
+    text-align: right;
+    word-break: break-all;
+  }
+
+  .data-value.highlight {
+    color: var(--red);
+    font-weight: 700;
+  }
+
+  .data-value.amber {
+    color: var(--amber);
+  }
+
+  /* Counter */
+  .counter-section {
+    text-align: center;
+    padding: 20px;
+    margin: 24px 0;
+    background: rgba(255, 51, 51, 0.05);
+    border: 1px solid rgba(255, 51, 51, 0.2);
+    border-radius: 8px;
+  }
+
+  .counter-label {
+    font-size: 10px;
+    color: var(--red);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .counter-value {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--red);
+    text-shadow: 0 0 20px rgba(255,51,51,0.5);
+  }
+
+  .counter-sublabel {
+    font-size: 10px;
+    color: #555;
+    margin-top: 6px;
+  }
+
+  /* Reveal section */
+  .reveal-section {
+    margin-top: 32px;
+    padding: 24px;
+    background: linear-gradient(135deg, rgba(0,255,65,0.05), rgba(0,255,65,0.02));
+    border: 1px solid var(--green-dark);
+    border-radius: 8px;
+    text-align: center;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 0.6s ease;
+  }
+
+  .reveal-section.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .reveal-section .emoji {
+    font-size: 40px;
+    margin-bottom: 12px;
+  }
+
+  .reveal-section h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 20px;
+    color: var(--green);
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+
+  .reveal-section p {
+    font-size: 12px;
+    line-height: 1.8;
+    color: #888;
+    margin-bottom: 10px;
+  }
+
+  .reveal-section .course-tag {
+    display: inline-block;
+    padding: 6px 16px;
+    background: var(--green-dark);
+    color: var(--green);
+    border-radius: 20px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    margin-top: 12px;
+  }
+
+  .lessons-list {
+    text-align: left;
+    margin: 16px 0;
+    padding: 16px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 6px;
+  }
+
+  .lessons-list .lesson {
+    padding: 6px 0;
+    font-size: 11px;
+    color: var(--green-dim);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .lessons-list .lesson::before {
+    content: '→';
+    color: var(--amber);
+    flex-shrink: 0;
+  }
+
+  /* Footer terminal */
+  .terminal-footer {
+    margin-top: 24px;
+    padding: 12px;
+    font-size: 10px;
+    color: #333;
+    text-align: center;
+    letter-spacing: 1px;
+  }
+
+  /* Mobile adjustments */
+  @media (max-width: 480px) {
+    #main-content { padding: 12px; }
+    .header h1 { font-size: 15px; letter-spacing: 2px; }
+    .data-row { flex-direction: column; gap: 4px; }
+    .data-value { text-align: left; }
+    .counter-value { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="loading-screen">
+  <div class="loading-icon"></div>
+  <div class="loading-text">Escaneando dispositivo...</div>
+  <div class="progress-bar-container">
+    <div class="progress-bar-fill"></div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div id="main-content">
+  <div class="header">
+    <div class="warning-icon">⚠</div>
+    <h1>Datos Capturados</h1>
+    <div class="subtitle">Análisis completo del dispositivo</div>
+  </div>
+
+  <!-- Device Info -->
+  <div class="terminal-section">
+    <div class="section-label">▸ Dispositivo & Sistema</div>
+    <div class="data-row" data-delay="0">
+      <span class="data-label">Sistema Op.</span>
+      <span class="data-value" id="os">—</span>
+    </div>
+    <div class="data-row" data-delay="100">
+      <span class="data-label">Navegador</span>
+      <span class="data-value" id="browser">—</span>
+    </div>
+    <div class="data-row" data-delay="200">
+      <span class="data-label">Plataforma</span>
+      <span class="data-value" id="platform">—</span>
+    </div>
+    <div class="data-row" data-delay="300">
+      <span class="data-label">Pantalla</span>
+      <span class="data-value" id="screen">—</span>
+    </div>
+    <div class="data-row" data-delay="400">
+      <span class="data-label">Idiomas</span>
+      <span class="data-value" id="languages">—</span>
+    </div>
+    <div class="data-row" data-delay="500">
+      <span class="data-label">User Agent</span>
+      <span class="data-value amber" id="useragent" style="font-size:9px;">—</span>
+    </div>
+  </div>
+
+  <!-- Network Info -->
+  <div class="terminal-section">
+    <div class="section-label">▸ Red & Conexión</div>
+    <div class="data-row" data-delay="600">
+      <span class="data-label">IP Pública</span>
+      <span class="data-value highlight" id="ip">—</span>
+    </div>
+    <div class="data-row" data-delay="700">
+      <span class="data-label">Proveedor</span>
+      <span class="data-value" id="isp">—</span>
+    </div>
+    <div class="data-row" data-delay="800">
+      <span class="data-label">Conexión</span>
+      <span class="data-value" id="connection">—</span>
+    </div>
+    <div class="data-row" data-delay="900">
+      <span class="data-label">Batería</span>
+      <span class="data-value" id="battery">—</span>
+    </div>
+  </div>
+
+  <!-- Location Info -->
+  <div class="terminal-section">
+    <div class="section-label">▸ Ubicación Aproximada</div>
+    <div class="data-row" data-delay="1000">
+      <span class="data-label">Ciudad</span>
+      <span class="data-value highlight" id="city">—</span>
+    </div>
+    <div class="data-row" data-delay="1100">
+      <span class="data-label">Región</span>
+      <span class="data-value" id="region">—</span>
+    </div>
+    <div class="data-row" data-delay="1200">
+      <span class="data-label">País</span>
+      <span class="data-value" id="country">—</span>
+    </div>
+    <div class="data-row" data-delay="1300">
+      <span class="data-label">Zona Horaria</span>
+      <span class="data-value" id="timezone">—</span>
+    </div>
+    <div class="data-row" data-delay="1400">
+      <span class="data-label">Coordenadas</span>
+      <span class="data-value highlight" id="coords">—</span>
+    </div>
+  </div>
+
+  <!-- Hardware -->
+  <div class="terminal-section">
+    <div class="section-label">▸ Hardware & Capacidades</div>
+    <div class="data-row" data-delay="1500">
+      <span class="data-label">CPU Cores</span>
+      <span class="data-value" id="cores">—</span>
+    </div>
+    <div class="data-row" data-delay="1600">
+      <span class="data-label">RAM (aprox)</span>
+      <span class="data-value" id="ram">—</span>
+    </div>
+    <div class="data-row" data-delay="1700">
+      <span class="data-label">GPU</span>
+      <span class="data-value" id="gpu">—</span>
+    </div>
+    <div class="data-row" data-delay="1800">
+      <span class="data-label">Touch</span>
+      <span class="data-value" id="touch">—</span>
+    </div>
+  </div>
+
+  <!-- Scan Time Counter -->
+  <div class="counter-section" id="counter-section" style="opacity:0;">
+    <div class="counter-label">Tiempo de Recopilación</div>
+    <div class="counter-value" id="scan-time">< 3s</div>
+    <div class="counter-sublabel">Todo esto en una sola visita a una URL</div>
+  </div>
+
+  <!-- REVEAL: Educational message -->
+  <div class="reveal-section" id="reveal">
+    <div class="emoji">🎓</div>
+    <h2>¡Tranquilo! Esto es una demostración.</h2>
+    <p>
+      Nadie robó tus datos. Esta página fue creada por tu profesor como ejercicio
+      de concientización en seguridad del software.
+    </p>
+    <p>
+      Sin embargo, todo lo que viste arriba es <strong style="color:var(--amber)">real</strong>. Un atacante podría
+      haber recopilado esta misma información con un simple QR code.
+    </p>
+    <div class="lessons-list">
+      <div class="lesson">Nunca escanees un QR de origen desconocido sin verificar la URL primero</div>
+      <div class="lesson">Un sitio web puede recopilar datos de tu dispositivo sin pedir permiso</div>
+      <div class="lesson">Tu navegador revela mucha más información de la que crees</div>
+      <div class="lesson">Técnicas de ingeniería social (como un QR en una pizarra) explotan la confianza</div>
+      <div class="lesson">Esta misma página podría haber sido un sitio de phishing idéntico a tu banco</div>
+    </div>
+    <div class="course-tag">SEGURIDAD DEL SOFTWARE</div>
+  </div>
+
+  <div class="terminal-footer">
+    [ Ningún dato fue almacenado ni transmitido — demo 100% client-side ]
+  </div>
+</div>
+
+<script>
+// ========================
+// DATA COLLECTION MODULE
+// ========================
+
+async function collectData() {
+  const data = {};
+
+  // OS Detection
+  const ua = navigator.userAgent;
+  if (/Windows/.test(ua)) data.os = 'Windows ' + (ua.match(/Windows NT (\d+\.\d+)/)?.[1] || '');
+  else if (/Mac OS X/.test(ua)) data.os = 'macOS ' + (ua.match(/Mac OS X ([\d_]+)/)?.[1]?.replace(/_/g, '.') || '');
+  else if (/Android/.test(ua)) data.os = 'Android ' + (ua.match(/Android ([\d.]+)/)?.[1] || '');
+  else if (/iPhone|iPad/.test(ua)) data.os = 'iOS ' + (ua.match(/OS ([\d_]+)/)?.[1]?.replace(/_/g, '.') || '');
+  else if (/Linux/.test(ua)) data.os = 'Linux';
+  else data.os = 'Desconocido';
+
+  // Browser Detection
+  if (/Edg\//.test(ua)) data.browser = 'Microsoft Edge ' + (ua.match(/Edg\/([\d.]+)/)?.[1] || '');
+  else if (/OPR\//.test(ua)) data.browser = 'Opera ' + (ua.match(/OPR\/([\d.]+)/)?.[1] || '');
+  else if (/Chrome\//.test(ua) && !/Edg/.test(ua)) data.browser = 'Chrome ' + (ua.match(/Chrome\/([\d.]+)/)?.[1] || '');
+  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) data.browser = 'Safari ' + (ua.match(/Version\/([\d.]+)/)?.[1] || '');
+  else if (/Firefox\//.test(ua)) data.browser = 'Firefox ' + (ua.match(/Firefox\/([\d.]+)/)?.[1] || '');
+  else data.browser = 'Desconocido';
+
+  // Platform
+  data.platform = navigator.platform || navigator.userAgentData?.platform || 'Desconocido';
+
+  // Screen
+  data.screen = `${screen.width}×${screen.height} @ ${window.devicePixelRatio || 1}x`;
+
+  // Languages
+  data.languages = (navigator.languages || [navigator.language]).join(', ') || 'Desconocido';
+
+  // User Agent
+  data.useragent = navigator.userAgent;
+
+  // Connection
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (conn) {
+    data.connection = `${conn.effectiveType?.toUpperCase() || '?'} — ~${conn.downlink || '?'} Mbps`;
+  } else {
+    data.connection = navigator.onLine ? 'Online (detalles no disponibles)' : 'Offline';
+  }
+
+  // Battery
+  try {
+    const battery = await navigator.getBattery?.();
+    if (battery) {
+      const pct = Math.round(battery.level * 100);
+      const charging = battery.charging ? ' ⚡ Cargando' : ' 🔋 Descargando';
+      data.battery = `${pct}%${charging}`;
+    } else {
+      data.battery = 'No disponible';
+    }
+  } catch {
+    data.battery = 'No disponible';
+  }
+
+  // Hardware
+  data.cores = navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} núcleos lógicos` : 'No disponible';
+  data.ram = navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'No disponible';
+
+  // GPU via WebGL
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (gl) {
+      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      data.gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'WebGL disponible (modelo oculto)';
+    } else {
+      data.gpu = 'WebGL no disponible';
+    }
+  } catch {
+    data.gpu = 'No disponible';
+  }
+
+  // Touch
+  data.touch = navigator.maxTouchPoints > 0 ? `Sí (${navigator.maxTouchPoints} puntos)` : 'No';
+
+  // Timezone
+  data.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Desconocido';
+
+  // IP & Geolocation via public API
+  try {
+    const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(5000) });
+    const geo = await res.json();
+    data.ip = geo.ip || 'No disponible';
+    data.city = geo.city || 'Desconocida';
+    data.region = geo.region || 'Desconocida';
+    data.country = `${geo.country_name || '?'} (${geo.country_code || '?'})`;
+    data.isp = geo.org || 'Desconocido';
+    data.coords = `${geo.latitude}, ${geo.longitude}`;
+  } catch {
+    data.ip = 'No disponible (bloqueado)';
+    data.city = '—';
+    data.region = '—';
+    data.country = '—';
+    data.isp = '—';
+    data.coords = '—';
+  }
+
+  return data;
+}
+
+// ========================
+// DISPLAY MODULE
+// ========================
+
+function displayData(data) {
+  const fields = [
+    'os', 'browser', 'platform', 'screen', 'languages', 'useragent',
+    'ip', 'isp', 'connection', 'battery',
+    'city', 'region', 'country', 'timezone', 'coords',
+    'cores', 'ram', 'gpu', 'touch'
+  ];
+
+  fields.forEach(field => {
+    const el = document.getElementById(field);
+    if (el && data[field]) {
+      el.textContent = data[field];
+    }
+  });
+
+  // Animate rows
+  const rows = document.querySelectorAll('.data-row');
+  rows.forEach((row, i) => {
+    const delay = parseInt(row.dataset.delay) || i * 100;
+    setTimeout(() => row.classList.add('visible'), delay);
+  });
+
+  // Show counter
+  const lastRowDelay = Math.max(...Array.from(rows).map(r => parseInt(r.dataset.delay) || 0));
+  setTimeout(() => {
+    document.getElementById('counter-section').style.opacity = '1';
+    document.getElementById('counter-section').style.transition = 'opacity 0.5s ease';
+  }, lastRowDelay + 300);
+
+  // Show reveal
+  setTimeout(() => {
+    document.getElementById('reveal').classList.add('visible');
+  }, lastRowDelay + 800);
+}
+
+// ========================
+// INIT
+// ========================
+
+async function init() {
+  const data = await collectData();
+
+  // Transition from loading to content
+  setTimeout(() => {
+    document.getElementById('loading-screen').classList.add('fade-out');
+    const main = document.getElementById('main-content');
+    main.style.display = 'block';
+
+    setTimeout(() => displayData(data), 300);
+  }, 2800);
+}
+
+init();
+</script>
+</body>
+</html>
